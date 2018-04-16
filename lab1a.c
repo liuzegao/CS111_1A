@@ -130,14 +130,14 @@ int main(int argc, char * argv[]) {
                 fprintf(stderr, "Error: failed execvp() \r\n");
                 exit(1); //EXAM: check if we should exit wiht 1 or others
             }
-        }else{//father process
+        }else{//parent process
             //Close useless fd
             close(toChildPip[0]);
             close(toParentPip[1]);
             
             changeInputMode();
             char parentbuffer;
-            //char longparentbuffer[2048] = "";
+            //char longparentbuffer[256] = "";
             //char shellbuffer[2048] = "\0";
             char newbuffer[2048] = "\0";
 
@@ -157,7 +157,7 @@ int main(int argc, char * argv[]) {
                     exit(1);
                 }
                 if ((pollFdGroup[0].revents & POLLIN)){
-                    if(read(0,&parentbuffer, sizeof(parentbuffer))<0){
+                    if(read(0,&parentbuffer, 1)<0){
                         fprintf(stderr, "Error: failed parent stdin \r\n");
                         exit(1);
                     }
@@ -169,29 +169,64 @@ int main(int argc, char * argv[]) {
                         //exit(0);
                     }else if(parentbuffer == '\r' || parentbuffer  == '\n'){
                         char tempBuffer = {'\n'};
-                        write(toChildPip[1],&tempBuffer,sizeof(tempBuffer));
+                        int writeRC =  write(toChildPip[1],&tempBuffer,sizeof(tempBuffer));
+                        int errorNote = errno;
+                        if( writeRC < 0 ){
+                            fprintf(stderr, "Error:%s.\r\n", strerror(errorNote));
+                            exit(1);
+                        }
                         char templineBuffer[2] = {'\r','\n'};
-                        write(1,templineBuffer,sizeof(templineBuffer));
+                        writeRC = write(1,templineBuffer,sizeof(templineBuffer));
+                        errorNote = errno;
+                        if( writeRC < 0 ){
+                            fprintf(stderr, "Error:%s.\r\n", strerror(errorNote));
+                            exit(1);
+                        }
                     }else{
-                        write(toChildPip[1], &parentbuffer, sizeof(parentbuffer));
-                        write(1,&parentbuffer,sizeof(parentbuffer));
+                        int writeRC = write(toChildPip[1], &parentbuffer, sizeof(parentbuffer));
+                        int errorNote = errno;
+                        if( writeRC < 0 ){
+                            fprintf(stderr, "Error:%s.\r\n", strerror(errorNote));
+                            exit(1);
+                        }
+                        writeRC = write(1,&parentbuffer,sizeof(parentbuffer));
+                        errorNote = errno;
+                        if( writeRC < 0 ){
+                            fprintf(stderr, "Error:%s.\r\n", strerror(errorNote));
+                            exit(1);
+                        }
                     }
                 }
                 if ((pollFdGroup[1].revents & POLLIN)) {
                     int count = read(toParentPip[0], newbuffer, 2048); // read from shell pipe
-                    int readErrorNote = errno;
+                    int errorNote = errno;
                     if( count < 0 ){
-                        fprintf(stderr, "Error:%s. \r\n", strerror(readErrorNote));
+                        fprintf(stderr, "Error:%s.\r\n", strerror(errorNote));
                         exit(1);
                     }
                     int i;
                     for(i = 0;i<count;i++){
                         if(newbuffer[i] == '\n'){
                             char tempshellBuffer[2] = {'\r','\n'};
-                            write(1,&tempshellBuffer,sizeof(tempshellBuffer));
-                            write(1,tempshellBuffer,sizeof(tempshellBuffer));
+                            int writeRC  = write(1,&tempshellBuffer,sizeof(tempshellBuffer));
+                            errorNote = errno;
+                            if( writeRC < 0 ){
+                                fprintf(stderr, "Error:%s.\r\n", strerror(errorNote));
+                                exit(1);
+                            }
+                            writeRC = write(1,tempshellBuffer,sizeof(tempshellBuffer));
+                            errorNote = errno;
+                            if( writeRC < 0 ){
+                                fprintf(stderr, "Error:%s.\r\n", strerror(errorNote));
+                                exit(1);
+                            }
                         }else{
-                            write(1,&newbuffer[i],1);
+                            int writeRC = write(1,&newbuffer[i],1);
+                            errorNote = errno;
+                            if( writeRC < 0 ){
+                                fprintf(stderr, "Error:%s.\r\n", strerror(errorNote));
+                                exit(1);
+                            }
                         }
                     }
                 }
